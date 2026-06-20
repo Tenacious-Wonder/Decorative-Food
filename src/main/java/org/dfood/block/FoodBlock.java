@@ -349,12 +349,7 @@ public class FoodBlock extends Block {
     public boolean canPlaceAt(BlockState state, WorldView world, BlockPos pos) {
         BlockPos downPos = pos.down();
         BlockState checkState = world.getBlockState(downPos);
-        return !state.isReplaceable() && !DFoodUtils.isModFoodBlock(checkState.getBlock());
-    }
-
-    @Override
-    public boolean canReplace(BlockState state, ItemPlacementContext context) {
-        return DFoodUtils.isModFoodBlock(state.getBlock());
+        return !checkState.isReplaceable() && !DFoodUtils.isModFoodBlock(checkState.getBlock());
     }
 
     /**

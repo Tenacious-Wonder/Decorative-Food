@@ -8,6 +8,7 @@ import net.minecraft.component.type.FoodComponents;
 import net.minecraft.component.type.PotionContentsComponent;
 import net.minecraft.fluid.Fluids;
 import net.minecraft.item.*;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.Rarity;
 import org.dfood.block.FoodBlocks;
 import org.dfood.item.*;
