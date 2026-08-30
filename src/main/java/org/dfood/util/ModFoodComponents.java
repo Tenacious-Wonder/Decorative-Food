@@ -5,7 +5,29 @@ import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
 
 /**
- * 包含模组中非炖菜类食物的食物组件定义
+ * <h1>模组自有食物组件</h1>
+ *
+ * <p>提供一份<b>不含任何原版物品引用</b>的食物组件定义，专门用于替换原版食物到方块时
+ * 在静态初始化阶段即时创建这些食物。之所以不直接复用原版 {@link FoodComponent} 静态表，是因为
+ * 1.21.1+ 版本的时序问题（见下文）。</p>
+ *
+ * <h2>为什么存在</h2>
+ *
+ * <p>原版 {@code net.minecraft.component.type.FoodComponents} 的静态初始化块中，炖菜类组件
+ * （如 {@code rabbit_stew}、{@code suspicious_stew}）通过 {@code usingConvertsTo(Items.BOWL)}
+ * 引用了原版物品 {@code bowl}。本模组借助混入程序在 {@code Items} 的静态初始化期间就拦截物品注册，
+ * 并顺势触发 {@code FoodToBlocks} 的静态初始化；{@code FoodToBlocks} 又会在这一阶段创建各类替换物品。
+ * 若此处直接加载原版 {@code FoodComponents}，就会在 {@code Items.bowl} 尚未实例化时就触发其静态初始化，
+ * 从而对 {@code Items.bowl} 产生空引用，导致游戏启动时崩溃。</p>
+ *
+ * <h2>处理方式</h2>
+ *
+ * <p>本类因此按照原版各食物的营养价值、饱和度和状态效果，为<b>所有非炖菜类食物</b>重写了一份等价但
+ * <b>不含物品引用</b>的组件。这样 {@code FoodToBlocks} 在静态阶段加载时不会提前实例化原版 {@code Items}
+ * 的容器物品。真正依赖容器（碗）的炖菜，由 {@code FoodToBlocks} 的<b>延时注册</b>在对应容器实例化后再用
+ * 原版组件构建，二者配合即规避了崩溃。</p>
+ *
+ * @see net.minecraft.component.type.FoodComponent
  */
 public class ModFoodComponents {
     // 零食类

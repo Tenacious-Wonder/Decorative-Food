@@ -4,7 +4,7 @@ import net.minecraft.registry.Registry;
 import net.minecraft.registry.Registries;
 import net.minecraft.sound.SoundEvent;
 import net.minecraft.util.Identifier;
-import org.dfood.ThreedFood;
+import org.dfood.DecorativeFood;
 
 public class ModSounds {
     // 肉
@@ -71,7 +71,7 @@ public class ModSounds {
     public static final SoundEvent LAVA_BUCKET_FALL = register("lava_bucket_fall");
 
     private static SoundEvent register(String path) {
-        Identifier id = Identifier.of(ThreedFood.MOD_ID, path);
+        Identifier id = Identifier.of(DecorativeFood.MOD_ID, path);
         return Registry.register(Registries.SOUND_EVENT, id, SoundEvent.of(id));
     }
 }

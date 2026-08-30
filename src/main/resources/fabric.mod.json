@@ -5,23 +5,23 @@
 	"name": "TW's Decorative Food",
 	"description": "Make the food placeable.Decorate your world!",
     "authors": ["Tenacious Wonder"],
-    "contact": {
-      "homepage": "https://modrinth.com/mod/decorative-food",
-      "sources": "https://github.com/666daji/Decorative-Food",
-      "issues": "https://github.com/666daji/Decorative-Food/issues"
-    },
+	"contact": {
+        "homepage": "https://modrinth.com/mod/decorative-food",
+		"sources": "https://github.com/666daji/Decorative-Food",
+        "issues": "https://github.com/666daji/Decorative-Food/issues"
+	},
 	"license": "MIT License",
 	"icon": "assets/dfood/icon.jpg",
 	"environment": "*",
 	"entrypoints": {
 		"main": [
-			"org.dfood.ThreedFood"
+			"org.dfood.DecorativeFood"
 		],
 		"client": [
-			"org.dfood.ThreedfoodClient"
+			"org.dfood.DecorativeFoodClient"
 		],
 		"fabric-datagen": [
-			"org.dfood.ThreedfoodDataGenerator"
+			"org.dfood.DecorativeFoodDataGenerator"
 		],
         "jade": [
           "org.dfood.jade.FoodBlockPlugin"

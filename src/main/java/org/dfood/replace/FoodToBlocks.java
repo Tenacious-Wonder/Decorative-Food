@@ -1,4 +1,4 @@
-package org.dfood.util;
+package org.dfood.replace;
 
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
@@ -8,11 +8,10 @@ import net.minecraft.component.type.FoodComponents;
 import net.minecraft.component.type.PotionContentsComponent;
 import net.minecraft.fluid.Fluids;
 import net.minecraft.item.*;
-import net.minecraft.util.Identifier;
 import net.minecraft.util.Rarity;
-import org.dfood.block.FoodBlocks;
 import org.dfood.item.*;
 import org.dfood.mixin.FoodToBlockMixin;
+import org.dfood.util.ModFoodComponents;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
@@ -35,8 +34,14 @@ import java.util.Map;
  *   <li>这会导致替换的蜂蜜瓶错误地绑定空值，引发游戏崩溃</li>
  * </ul>
  *
- * <p>延时注册通过延迟实例化的方式，仅在真正需要时才创建这些有依赖关系的物品，
- * 确保所有依赖项都已正确初始化，从而避免了空引用和崩溃问题。</p>
+ * <p>另外，原版 {@link FoodComponents} 的静态初始化块中，炖菜类食物组件（如{@code rabbit_stew}、
+ * {@code suspicious_stew}）通过 {@code usingConvertsTo(Items.BOWL)} 引用了 {@linkplain  Items#BOWL}。
+ * 而本模组在 {@code Items} 的静态初始化期间就通过 {@link FoodToBlockMixin} 触发本类的静态初始化；
+ * 若此时直接引用原版 {@code FoodComponents}，会在 {@code Items.BOWL} 尚未实例化时触发
+ * {@code FoodComponents} 的静态初始化，导致空引用崩溃。</p>
+ *
+ * <p>为了解决上述问题，本类静态初始化阶段使用模组自有的 {@link ModFoodComponents}（不引用碗），
+ * 而把需要容器引用的物品（炖菜、桶、蜂蜜瓶等）统一交由延时注册处理，待其依赖的容器物品实例化后再创建。</p>
  *
  * <p>对于有类似依赖关系的物品，都应使用延时注册机制进行处理。</p>
  *
@@ -70,7 +75,7 @@ public class FoodToBlocks {
         FOOD_MAP.put("golden_apple", createItem(FoodBlocks.GOLDEN_APPLE, ModFoodComponents.GOLDEN_APPLE));
         FOOD_MAP.put("golden_carrot", createItem(FoodBlocks.GOLDEN_CARROT, ModFoodComponents.GOLDEN_CARROT));
         FOOD_MAP.put("glistering_melon_slice", new BlockItem(FoodBlocks.GLISTERING_MELON_SLICE, new Item.Settings()));
-        FOOD_MAP.put("enchanted_golden_apple", new BlockItem(FoodBlocks.ENCHANTED_GOLDEN_APPLE, new Item.Settings().rarity(Rarity.EPIC).food(ModFoodComponents.ENCHANTED_GOLDEN_APPLE).component(DataComponentTypes.ENCHANTMENT_GLINT_OVERRIDE, true)));
+        FOOD_MAP.put("enchanted_golden_apple", new ModEnchantedGoldenAppleItem(new Item.Settings().rarity(Rarity.EPIC).food(ModFoodComponents.ENCHANTED_GOLDEN_APPLE).component(DataComponentTypes.ENCHANTMENT_GLINT_OVERRIDE, true), FoodBlocks.ENCHANTED_GOLDEN_APPLE));
 
         // 生熟肉类
         FOOD_MAP.put("chicken", createItem(FoodBlocks.CHICKEN, ModFoodComponents.CHICKEN));
@@ -92,7 +97,7 @@ public class FoodToBlocks {
         FOOD_MAP.put("pufferfish", createItem(FoodBlocks.PUFFERFISH, ModFoodComponents.PUFFERFISH));
         FOOD_MAP.put("tropical_fish", createItem(FoodBlocks.TROPICAL_FISH, ModFoodComponents.TROPICAL_FISH));
 
-        // 炖菜类
+        // 炖菜类（需要引用碗，延时注册）
         FOOD_MAP.put("rabbit_stew", null);
         FOOD_MAP.put("mushroom_stew", null);
         FOOD_MAP.put("beetroot_soup", null);
@@ -111,7 +116,7 @@ public class FoodToBlocks {
         // 其他
         FOOD_MAP.put("pumpkin_pie", createItem(FoodBlocks.PUMPKIN_PIE, ModFoodComponents.PUMPKIN_PIE));
         FOOD_MAP.put("chorus_fruit", new ModChorusFruitItem(new Item.Settings().food(ModFoodComponents.CHORUS_FRUIT), FoodBlocks.CHORUS_FRUIT));
-        FOOD_MAP.put("egg", new ModEggItem(FoodBlocks.EGG, new Item.Settings().maxCount(16)));
+        FOOD_MAP.put("egg", new ModEggItem(new Item.Settings().maxCount(16), FoodBlocks.EGG));
         FOOD_MAP.put("totem_of_undying", new BlockItem(FoodBlocks.TOTEM_OF_UNDYING, new Item.Settings().maxCount(1).rarity(Rarity.UNCOMMON)));
 
         // 药水类
@@ -154,8 +159,8 @@ public class FoodToBlocks {
             switch (id) {
                 //桶
                 case "milk_bucket":
-                    item = new ModMilkBucketItem(FoodBlocks.MILK_BUCKET,
-                            new Item.Settings().recipeRemainder(Items.BUCKET).maxCount(1));
+                    item = new ModMilkBucketItem(new Item.Settings().recipeRemainder(Items.BUCKET).maxCount(1),
+                            FoodBlocks.MILK_BUCKET);
                     break;
                 case "water_bucket":
                     item = new ModBucketItem(Fluids.WATER,
@@ -168,16 +173,16 @@ public class FoodToBlocks {
 
                 // 炖菜类
                 case "rabbit_stew":
-                    item = new BlockItem(FoodBlocks.RABBIT_STEW, new Item.Settings().food(FoodComponents.RABBIT_STEW).maxCount(1));
+                    item = new ModStewItem(new Item.Settings().food(FoodComponents.RABBIT_STEW).maxCount(1), FoodBlocks.RABBIT_STEW);
                     break;
                 case "mushroom_stew":
-                    item = new BlockItem(FoodBlocks.MUSHROOM_STEW, new Item.Settings().food(FoodComponents.MUSHROOM_STEW).maxCount(1));
+                    item = new ModStewItem(new Item.Settings().food(FoodComponents.MUSHROOM_STEW).maxCount(1), FoodBlocks.MUSHROOM_STEW);
                     break;
                 case "beetroot_soup":
-                    item = new BlockItem(FoodBlocks.BEETROOT_SOUP, new Item.Settings().food(FoodComponents.BEETROOT_SOUP).maxCount(1));
+                    item = new ModStewItem(new Item.Settings().food(FoodComponents.BEETROOT_SOUP).maxCount(1), FoodBlocks.BEETROOT_SOUP);
                     break;
                 case "suspicious_stew":
-                    item = new ModSuspiciousItem(FoodBlocks.SUSPICIOUS_STEW, new Item.Settings().food(FoodComponents.SUSPICIOUS_STEW).maxCount(1));
+                    item = new ModSuspiciousStewItem(new Item.Settings().food(FoodComponents.SUSPICIOUS_STEW).maxCount(1), FoodBlocks.SUSPICIOUS_STEW);
                     break;
                 case "bowl":
                     item = new BlockItem(FoodBlocks.BOWL, new Item.Settings());

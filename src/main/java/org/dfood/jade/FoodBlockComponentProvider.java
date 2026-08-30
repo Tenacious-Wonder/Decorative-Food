@@ -2,7 +2,8 @@ package org.dfood.jade;
 
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
-import org.dfood.ThreedFood;
+import org.dfood.DecorativeFood;
+import org.dfood.block.SimpleFoodBlock;
 import org.dfood.util.DFoodUtils;
 import snownee.jade.api.BlockAccessor;
 import snownee.jade.api.IBlockComponentProvider;
@@ -10,12 +11,12 @@ import snownee.jade.api.ITooltip;
 import snownee.jade.api.config.IPluginConfig;
 
 public class FoodBlockComponentProvider implements IBlockComponentProvider {
-    public static final Identifier ID = Identifier.of(ThreedFood.MOD_ID, "food_block");
+    public static final Identifier ID = Identifier.of(DecorativeFood.MOD_ID, "food_block");
 
     @Override
     public void appendTooltip(ITooltip iTooltip, BlockAccessor blockAccessor, IPluginConfig iPluginConfig) {
         // 显示当前食物方块的堆叠数量
-        if (DFoodUtils.isModFoodBlock(blockAccessor.getBlock())) {
+        if (DFoodUtils.isModFoodBlock(blockAccessor.getBlock()) && !(blockAccessor.getBlock() instanceof SimpleFoodBlock)) {
             int count = DFoodUtils.getFoodBlockCount(blockAccessor.getBlockState());
             iTooltip.add(Text.translatable("jade.dfood.food_count", count));
         }
@@ -23,6 +24,6 @@ public class FoodBlockComponentProvider implements IBlockComponentProvider {
 
     @Override
     public Identifier getUid() {
-        return Identifier.of(ThreedFood.MOD_ID, "food_block");
+        return ID;
     }
 }

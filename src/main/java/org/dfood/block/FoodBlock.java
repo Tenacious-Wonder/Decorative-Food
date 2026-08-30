@@ -38,7 +38,6 @@ import java.util.Set;
 
 /**
  * 食物方块的抽象基类，定义了所有食物方块的通用行为和属性。
- * 支持堆叠放置、方向控制、自定义交互逻辑等功能。
  */
 public class FoodBlock extends Block {
     /** 所有食物方块的注册集合，用于统一管理 */
@@ -99,6 +98,8 @@ public class FoodBlock extends Block {
                 .with(NUMBER_OF_FOOD, 1));
     }
 
+    /* ==================== 方块生命周期回调（Vanilla Block 行为） ==================== */
+
     /**
      * 获取翻译键，根据配置决定使用物品翻译键或方块翻译键
      */
@@ -140,13 +141,17 @@ public class FoodBlock extends Block {
                 .with(NUMBER_OF_FOOD, 1);
     }
 
+    /**
+     * 玩家右键方块时触发。整体流程为“优先调用自定义钩子 → 尝试添加 → 尝试取出”，
+     * 其中添加与取出的具体行为委托给可重写扩展点。
+     */
     @Override
     public ActionResult onUse(BlockState state, World world, BlockPos pos, PlayerEntity player, BlockHitResult hit) {
-        // 调用自定义钩子
+        // 优先执行自定义钩子
         if (this.onUseHook != null) {
-            ActionResult HookResult = this.onUseHook.interact(state, world, pos, player, hit);
-            if (HookResult != ActionResult.PASS) {
-                return HookResult;
+            ActionResult hookResult = this.onUseHook.interact(state, world, pos, player, hit);
+            if (hookResult != ActionResult.PASS) {
+                return hookResult;
             }
         }
 
@@ -184,8 +189,75 @@ public class FoodBlock extends Block {
         return ActionResult.PASS;
     }
 
+    @Override
+    public BlockState getStateForNeighborUpdate(BlockState state,
+                                                Direction direction,
+                                                BlockState neighborState,
+                                                WorldAccess world,
+                                                BlockPos pos,
+                                                BlockPos neighborPos) {
+        return !state.canPlaceAt(world, pos)
+                ? Blocks.AIR.getDefaultState()
+                : super.getStateForNeighborUpdate(state, direction, neighborState, world, pos, neighborPos);
+    }
+
+    @Override
+    public boolean canPlaceAt(BlockState state, WorldView world, BlockPos pos) {
+        BlockPos downPos = pos.down();
+        BlockState checkState = world.getBlockState(downPos);
+        return !checkState.isReplaceable() && !DFoodUtils.isModFoodBlock(checkState.getBlock());
+    }
+
+    @Override
+    public boolean canReplace(BlockState state, ItemPlacementContext context) {
+        return DFoodUtils.isModFoodBlock(state.getBlock());
+    }
+
     /**
-     * 尝试增加堆叠数量
+     * 硬编码掉落物，直接返回方块对应的物品
+     */
+    @Override
+    public List<ItemStack> getDroppedStacks(BlockState state,
+                                            LootContextParameterSet.Builder builder) {
+        int foodCount = state.get(NUMBER_OF_FOOD);
+        if (foodCount <= 0) {
+            return Collections.emptyList();
+        }
+        return Collections.singletonList(new ItemStack(this.asItem(), foodCount));
+    }
+
+    /**
+     * 获取方块对应的物品（若指定了强制物品则返回该物品）
+     */
+    @Override
+    public Item asItem() {
+        if (haveCItem()) {
+            return cItem.getItem();
+        }
+        return super.asItem();
+    }
+
+    @Override
+    public BlockState rotate(BlockState state, BlockRotation rotation) {
+        return state.with(FACING, rotation.rotate(state.get(FACING)));
+    }
+
+    @Override
+    public BlockState mirror(BlockState state, BlockMirror mirror) {
+        return state.rotate(mirror.getRotation(state.get(FACING)));
+    }
+
+    @Override
+    protected void appendProperties(StateManager.Builder<Block, BlockState> builder) {
+        builder.add(FACING);
+        builder.add(IntPropertyManager.take());
+    }
+
+    /* ==================== 可重写扩展点（子类可定制） ==================== */
+
+    /**
+     * 尝试增加堆叠数量。子类可覆写以在堆叠时写入额外数据
+     * （例如{@linkplain ComplexFoodBlock}把物品组件存入方块实体）。
      * @return 操作是否成功
      */
     protected boolean tryAdd(BlockState state,
@@ -200,23 +272,8 @@ public class FoodBlock extends Block {
     }
 
     /**
-     * 消耗玩家手中的物品
-     * @param player 执行操作的玩家
-     * @param handStack 手持物品堆栈
-     * @param hand 使用的手
-     * @return 消耗是否成功
-     */
-    protected boolean consumeItemIfNotCreative(PlayerEntity player, ItemStack handStack, Hand hand) {
-        if (!player.isCreative() && !handStack.isEmpty()) {
-            handStack.decrement(1);
-            player.setStackInHand(hand, handStack);
-            return true;
-        }
-        return false;
-    }
-
-    /**
-     * 尝试减少堆叠数量
+     * 尝试减少堆叠数量；减到 0 时移除方块。
+     * <p>总是从方块实体弹出数据以保持栈与状态一致，仅在非创造模式把取出的食物交给玩家。
      * @return 操作是否成功
      */
     protected boolean tryRemove(BlockState state,
@@ -234,9 +291,9 @@ public class FoodBlock extends Block {
             world.setBlockState(pos, Blocks.AIR.getDefaultState(), Block.NOTIFY_ALL);
         }
 
-        // 给予玩家物品（非创造模式）
+        // 总是弹栈并生成物品（保持方块数据一致），创造模式仅跳过“交给玩家”
+        ItemStack foodItem = createStack(1, state, blockEntity);
         if (!player.isCreative()) {
-            ItemStack foodItem = createStack(1, state, blockEntity);
             if (!player.giveItemStack(foodItem)) {
                 player.dropItem(foodItem, false);
             }
@@ -246,7 +303,24 @@ public class FoodBlock extends Block {
     }
 
     /**
-     * 检查手持物品是否与方块匹配
+     * 消耗玩家手中的物品（非创造模式才消耗）。
+     * @param player 执行操作的玩家
+     * @param handStack 手持物品堆栈
+     * @param hand 使用的手
+     * @return 消耗是否成功
+     */
+    protected boolean consumeItemIfNotCreative(PlayerEntity player, ItemStack handStack, Hand hand) {
+        if (!player.isCreative() && !handStack.isEmpty()) {
+            handStack.decrement(1);
+            player.setStackInHand(hand, handStack);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * 检查手持物品是否与方块匹配。子类可覆写以比较更细的物品数据
+     * （例如{@linkplain SuspiciousStewBlock}比较可疑炖菜的 NBT 效果）。
      * @return 匹配返回true，否则返回false
      */
     public boolean isSame(ItemStack stack, BlockState state, BlockEntity blockEntity) {
@@ -254,7 +328,8 @@ public class FoodBlock extends Block {
     }
 
     /**
-     * 创建对应物品堆栈
+     * 创建对应物品堆栈。子类可覆写以把方块实体中的附加数据写回物品
+     * （例如恢复药水效果、可疑炖菜效果）。
      *
      * @param count 物品数量
      * @param state 方块状态
@@ -297,6 +372,8 @@ public class FoodBlock extends Block {
         );
     }
 
+    /* ==================== 对外接口 ==================== */
+
     public @Nullable OnUseHook getOnUseHook() {
         return onUseHook;
     }
@@ -333,64 +410,7 @@ public class FoodBlock extends Block {
         return cItem;
     }
 
-    @Override
-    public BlockState getStateForNeighborUpdate(BlockState state,
-                                                Direction direction,
-                                                BlockState neighborState,
-                                                WorldAccess world,
-                                                BlockPos pos,
-                                                BlockPos neighborPos) {
-        return !state.canPlaceAt(world, pos)
-                ? Blocks.AIR.getDefaultState()
-                : super.getStateForNeighborUpdate(state, direction, neighborState, world, pos, neighborPos);
-    }
-
-    @Override
-    public boolean canPlaceAt(BlockState state, WorldView world, BlockPos pos) {
-        BlockPos downPos = pos.down();
-        BlockState checkState = world.getBlockState(downPos);
-        return !checkState.isReplaceable() && !DFoodUtils.isModFoodBlock(checkState.getBlock());
-    }
-
-    /**
-     * 硬编码掉落物，直接返回方块对应的物品
-     */
-    @Override
-    public List<ItemStack> getDroppedStacks(BlockState state,
-                                            LootContextParameterSet.Builder builder) {
-        int foodCount = state.get(NUMBER_OF_FOOD);
-        if (foodCount <= 0) {
-            return Collections.emptyList();
-        }
-        return Collections.singletonList(new ItemStack(this.asItem(), foodCount));
-    }
-
-    /**
-     * 获取方块对应的物品（若指定了强制物品则返回该物品）
-     */
-    @Override
-    public Item asItem() {
-        if (haveCItem()) {
-            return cItem.getItem();
-        }
-        return super.asItem();
-    }
-
-    @Override
-    public BlockState rotate(BlockState state, BlockRotation rotation) {
-        return state.with(FACING, rotation.rotate(state.get(FACING)));
-    }
-
-    @Override
-    public BlockState mirror(BlockState state, BlockMirror mirror) {
-        return state.rotate(mirror.getRotation(state.get(FACING)));
-    }
-
-    @Override
-    protected void appendProperties(StateManager.Builder<Block, BlockState> builder) {
-        builder.add(FACING);
-        builder.add(IntPropertyManager.take());
-    }
+    /* ==================== Builder ==================== */
 
     /**
      * 完全使用默认的参数。

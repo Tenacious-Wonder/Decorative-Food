@@ -60,7 +60,7 @@ public class ComplexFoodBlock extends FoodBlock implements BlockEntityProvider {
     }
 
     /**
-     * 尝试增加堆叠数量，并将物品组件更改存入方块实体。
+     * 尝试增加堆叠数量，并将物品组件更改存入方块实体；若存储失败（栈已满）则拒绝添加并返回 {@code false}。
      *
      * @param state 当前方块状态
      * @param world 所在世界
@@ -74,9 +74,11 @@ public class ComplexFoodBlock extends FoodBlock implements BlockEntityProvider {
     protected boolean tryAdd(BlockState state, World world, BlockPos pos, PlayerEntity player,
                              ItemStack handStack, @Nullable BlockEntity blockEntity) {
         if (blockEntity instanceof ComplexFoodBlockEntity complexFoodBlockEntity) {
-            // 获取物品堆栈的组件更改并存储
+            // 获取物品堆栈的组件更改并存储；栈已满时拒绝添加，避免状态与栈失配
             ComponentChanges componentChanges = handStack.getComponentChanges();
-            complexFoodBlockEntity.pushComponentChanges(componentChanges);
+            if (!complexFoodBlockEntity.pushComponentChanges(componentChanges)) {
+                return false;
+            }
         }
 
         return super.tryAdd(state, world, pos, player, handStack, blockEntity);
