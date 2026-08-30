@@ -60,7 +60,7 @@ public class ComplexFoodBlock extends FoodBlock implements BlockEntityProvider {
     }
 
     /**
-     * 尝试增加堆叠数量，并将物品 NBT 存入方块实体。
+     * 尝试增加堆叠数量，并将物品 NBT 存入方块实体；若存储失败（栈已满）则拒绝添加并返回 {@code false}。
      *
      * @return {@code true} 如果操作成功
      */
@@ -68,7 +68,10 @@ public class ComplexFoodBlock extends FoodBlock implements BlockEntityProvider {
     protected boolean tryAdd(BlockState state, World world, BlockPos pos, PlayerEntity player,
                              ItemStack handStack, @Nullable BlockEntity blockEntity) {
         if (blockEntity instanceof ComplexFoodBlockEntity complexFoodBlockEntity) {
-            complexFoodBlockEntity.pushNbt(copyOrEmpty(handStack));
+            // 将物品 NBT 压栈；栈已满时拒绝添加，避免状态与栈失配
+            if (!complexFoodBlockEntity.pushNbt(copyOrEmpty(handStack))) {
+                return false;
+            }
         }
 
         return super.tryAdd(state, world, pos, player, handStack, blockEntity);

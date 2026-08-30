@@ -271,7 +271,8 @@ public class FoodBlock extends Block {
     }
 
     /**
-     * 尝试减少堆叠数量；减到 0 时移除方块，并把取出的食物交给玩家（非创造模式）。
+     * 尝试减少堆叠数量；减到 0 时移除方块。
+     * <p>总是从方块实体弹出数据以保持栈与状态一致，仅在非创造模式把取出的食物交给玩家。
      * @return 操作是否成功
      */
     protected boolean tryRemove(BlockState state,
@@ -289,9 +290,9 @@ public class FoodBlock extends Block {
             world.setBlockState(pos, Blocks.AIR.getDefaultState(), Block.NOTIFY_ALL);
         }
 
-        // 给予玩家物品（非创造模式）
+        // 总是弹栈并生成物品（保持方块数据一致），创造模式仅跳过“交给玩家”
+        ItemStack foodItem = createStack(1, state, blockEntity);
         if (!player.isCreative()) {
-            ItemStack foodItem = createStack(1, state, blockEntity);
             if (!player.giveItemStack(foodItem)) {
                 player.dropItem(foodItem, false);
             }
