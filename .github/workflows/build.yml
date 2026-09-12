@@ -49,7 +49,7 @@ jobs:
           echo "minecraft_version=$(grep -m1 '^minecraft_version=' gradle.properties | cut -d'=' -f2 | tr -d '\r')" >> "$GITHUB_OUTPUT"
       - name: extract changelog of the current version
         if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-        run: awk '/^## /{c++} c==1' CHANGELOG.md > build/changelog.md
+        run: awk '/^## /{c++} c==1 && /^---[[:space:]]*$/{exit} c==1' CHANGELOG.md > build/changelog.md
       - name: publish
         if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         uses: Kira-NT/mc-publish@v3
