@@ -2,9 +2,23 @@
 # and submitted pull request. This can help catch issues that only occur on
 # certain platforms or Java versions, and provides a first line of defence
 # against bad commits.
+#
+# There are two ways to release the built jar (a GitHub Release plus a version on
+# Modrinth). Both of them take the version number from gradle.properties
+# (mod_version) and the changelog from the first "## " section of CHANGELOG.md:
+#
+#   1. push a tag whose name starts with "v" - the tag name is reused for the release;
+#   2. or start this workflow manually from the Actions page ("Run workflow"),
+#      which creates the tag "v<mod_version>" on the branch it was started from.
 
 name: build
-on: [pull_request, push]
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -28,3 +42,42 @@ jobs:
         with:
           name: Artifacts
           path: build/libs/
+      - name: read mod version
+        id: props
+        run: |
+          echo "mod_version=$(grep -m1 '^mod_version=' gradle.properties | cut -d'=' -f2 | tr -d '\r')" >> "$GITHUB_OUTPUT"
+          echo "minecraft_version=$(grep -m1 '^minecraft_version=' gradle.properties | cut -d'=' -f2 | tr -d '\r')" >> "$GITHUB_OUTPUT"
+      - name: extract changelog of the current version
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+        run: awk '/^## /{c++} c==1 && /^---[[:space:]]*$/{exit} c==1' CHANGELOG.md > build/changelog.md
+      - name: publish
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+        uses: Kira-NT/mc-publish@v3
+        with:
+          modrinth-id: 656seq5J
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+
+          # CurseForge 项目 ID（TW's Decorative Food）
+          curseforge-id: 1379029
+          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+          # CurseForge 的一条文件记录只能装一个 jar，且历史上只发布主 jar（不含 sources）
+          curseforge-files: 'build/libs/!(*-@(dev|sources|javadoc)).jar'
+
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+          # 由 tag 触发时沿用该 tag；手动触发时新建 "v<mod_version>" 作为 tag
+          github-tag: "${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v{0}', steps.props.outputs.mod_version) }}"
+          # 手动触发时以所选运行分支为准，避免 tag/Release 落到默认分支；tag 已存在时此项被忽略
+          github-commitish: ${{ github.ref_name }}
+
+          # 版本号取自 gradle.properties，与 Modrinth 上既有的 "1.20.1-x.y.z" 命名保持一致
+          name: "TW's Decorative Food ${{ steps.props.outputs.mod_version }}"
+          version: ${{ steps.props.outputs.mod_version }}
+          version-type: release
+
+          # 游戏版本同样取自 gradle.properties，各版本分支共用这份 workflow，无需再改此处
+          loaders: fabric
+          environment: client | server
+          game-versions: ${{ steps.props.outputs.minecraft_version }}
+
+          changelog-file: build/changelog.md
