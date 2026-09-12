@@ -54,6 +54,13 @@ jobs:
         with:
           modrinth-id: 656seq5J
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+
+          # CurseForge 项目 ID（TW's Decorative Food）
+          curseforge-id: 1379029
+          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+          # CurseForge 的一条文件记录只能装一个 jar，且历史上只发布主 jar（不含 sources）
+          curseforge-files: 'build/libs/!(*-@(dev|sources|javadoc)).jar'
+
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
           # 由 tag 触发时沿用该 tag；手动触发时新建 "v<mod_version>" 作为 tag
