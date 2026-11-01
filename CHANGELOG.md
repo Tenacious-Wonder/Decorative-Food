@@ -1,3 +1,7 @@
+## 1.20.1-2.0.2
+
+- Fixed placed food being replaced when placing a block against its side.
+
 ## 1.20.1-2.0.1
 
 - Fixed a stacking data mismatch caused by taking food back from a pile in creative mode.
