@@ -67,8 +67,9 @@ jobs:
 
           # 由 tag 触发时沿用该 tag；手动触发时新建 "v<mod_version>" 作为 tag
           github-tag: "${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('v{0}', steps.props.outputs.mod_version) }}"
-          # 手动触发时以所选运行分支为准，避免 tag/Release 落到默认分支；tag 已存在时此项被忽略
-          github-commitish: ${{ github.ref_name }}
+          # Release 的 target_commitish 只接受分支名或 commit SHA，不接受 tag 名：
+          # tag 触发时用 github.sha，手动触发时用所选分支（github.ref_name）
+          github-commitish: "${{ startsWith(github.ref, 'refs/tags/') && github.sha || github.ref_name }}"
 
           # 版本号取自 gradle.properties，与 Modrinth 上既有的 "1.20.1-x.y.z" 命名保持一致
           name: "TW's Decorative Food ${{ steps.props.outputs.mod_version }}"
